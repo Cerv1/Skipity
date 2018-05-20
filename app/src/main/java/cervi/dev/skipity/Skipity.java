@@ -21,10 +21,12 @@ public class Skipity extends Service {
     private AudioManager am;
     public Intent nextSongIntent = new Intent();
     private KeyEvent nextSong;
+    private Boolean firstBlock ;
 
 
     public Skipity() {
         super();
+        firstBlock = true;
     }
 
     // BroadcastReceiver for handling ACTION_SCREEN_OFF.
@@ -32,6 +34,10 @@ public class Skipity extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             // Check action just to be on the safe side.
+            if(firstBlock){
+                firstBlock=false;
+                return;
+            }
             if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
                 nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
                 Skipity.this.sendBroadcast(nextSongIntent);
