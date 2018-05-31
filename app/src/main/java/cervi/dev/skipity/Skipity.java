@@ -5,24 +5,74 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
+import android.database.ContentObserver;
 import android.media.AudioManager;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.KeyEvent;
 
 
+
 public class Skipity extends Service {
+    class SettingsContentObserver extends ContentObserver {
+        int previousVolume;
+        Context context;
+
+        public SettingsContentObserver(Context c, Handler handler) {
+            super(handler);
+            context=c;
+
+            AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            previousVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+        }
+
+        @Override
+        public boolean deliverSelfNotifications() {
+            return super.deliverSelfNotifications();
+        }
+
+        @Override
+        public void onChange(boolean selfChange) {
+            super.onChange(selfChange);
+
+            AudioManager audio = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            int currentVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
+
+            int delta=previousVolume-currentVolume;
+
+            if(delta>0)
+            {
+                Intent nextSongIntent = new Intent();
+                KeyEvent nextSong;
+                nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0);
+                nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
+                nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
+                Skipity.this.sendBroadcast(nextSongIntent);
+                Log.w("CERV1", "DOWN");
+                previousVolume=currentVolume;
+            }
+            else if(delta<0)
+            {
+                Intent nextSongIntent = new Intent();
+                KeyEvent nextSong;
+                nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0);
+                nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
+                nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
+                Skipity.this.sendBroadcast(nextSongIntent);
+                Log.w("CERV1", "UP");
+                previousVolume=currentVolume;
+
+            }
+        }
+    }
 
     private AudioManager am;
     public Intent nextSongIntent = new Intent();
     private KeyEvent nextSong;
     private Boolean firstBlock ;
-
+    SettingsContentObserver mSettingsContentObserver;
 
     public Skipity() {
         super();
@@ -34,23 +84,22 @@ public class Skipity extends Service {
         @Override
         public void onReceive(Context context, Intent intent) {
             // Check action just to be on the safe side.
-            if(firstBlock){
-                firstBlock=false;
-                return;
-            }
             if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
-                nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
+                getApplicationContext().getContentResolver().registerContentObserver(android.provider.Settings.System.CONTENT_URI, true, mSettingsContentObserver );
                 Skipity.this.sendBroadcast(nextSongIntent);
-                Log.w("CERV1", "Next Song");
+            }
+            else{
+                getApplicationContext().getContentResolver().unregisterContentObserver(mSettingsContentObserver);
             }
         }
     };
 
+
+
     @Override
     public void onCreate() {
         super.onCreate();
-        // registerReceiver(screenOffBroadcast, filter);
-
+        mSettingsContentObserver = new SettingsContentObserver(this, new Handler());
         am = (AudioManager) this.getSystemService(Context.AUDIO_SERVICE);
         nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
         nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0);
@@ -60,12 +109,13 @@ public class Skipity extends Service {
         startService();
     }
 
+
     private void startService() {
 
     }
 
+
     public int onStartCommand(Intent intent, int flags, int startId) {
-        // handleCommand(intent);
         return START_STICKY;
     }
 
@@ -81,4 +131,6 @@ public class Skipity extends Service {
     public IBinder onBind(Intent arg0) {
         return null; // no IPC used
     }
+
+
 }
