@@ -80,16 +80,27 @@ public class Skipity extends Service {
     }
 
     // BroadcastReceiver for handling ACTION_SCREEN_OFF.
-    private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver offReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
             // Check action just to be on the safe side.
             if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
                 getApplicationContext().getContentResolver().registerContentObserver(android.provider.Settings.System.CONTENT_URI, true, mSettingsContentObserver );
-                Skipity.this.sendBroadcast(nextSongIntent);
+                Log.w("CERV1", "LOCKED");
+                //Skipity.this.sendBroadcast(nextSongIntent);
             }
-            else{
+        }
+    };
+
+    // BroadcastReceiver for handling ACTION_SCREEN_ON.
+    private BroadcastReceiver onReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // Check action just to be on the safe side.
+            if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
                 getApplicationContext().getContentResolver().unregisterContentObserver(mSettingsContentObserver);
+                Log.w("CERV1", "UNLOCKED");
+                //Skipity.this.sendBroadcast(nextSongIntent);
             }
         }
     };
@@ -104,8 +115,12 @@ public class Skipity extends Service {
         nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
         nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0);
 
-        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(mReceiver, filter);
+        IntentFilter filterScreenOff = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        IntentFilter filterScreenOn = new IntentFilter(Intent.ACTION_SCREEN_ON);
+
+        registerReceiver(offReceiver, filterScreenOff);
+        registerReceiver(onReceiver, filterScreenOn);
+
         startService();
     }
 
@@ -123,7 +138,7 @@ public class Skipity extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(mReceiver);
+        unregisterReceiver(offReceiver);
         Log.w("CERV1", "Service stopped");
     }
 
