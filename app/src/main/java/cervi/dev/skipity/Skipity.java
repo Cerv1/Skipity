@@ -16,6 +16,7 @@ import android.view.KeyEvent;
 
 
 public class Skipity extends Service {
+
     class SettingsContentObserver extends ContentObserver {
         int previousVolume;
         Context context;
@@ -41,53 +42,60 @@ public class Skipity extends Service {
             int currentVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC);
 
             int delta=previousVolume-currentVolume;
+            if(prevent_onChange) {
+                prevent_onChange=false;
+                if (delta > 0) {
+                    Intent nextSongIntent = new Intent();
+                    KeyEvent nextSong;
+                    nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0);
+                    nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
+                    nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
+                    Skipity.this.sendBroadcast(nextSongIntent);
+                    Log.w("CERV1", "DOWN");
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume + 1, AudioManager.FLAG_VIBRATE);
+                    previousVolume = currentVolume;
+                }
 
-            if(delta>0)
-            {
-                Intent nextSongIntent = new Intent();
-                KeyEvent nextSong;
-                nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PREVIOUS, 0);
-                nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
-                nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
-                Skipity.this.sendBroadcast(nextSongIntent);
-                Log.w("CERV1", "DOWN");
-                previousVolume=currentVolume;
+                else if (delta < 0) {
+                    Intent nextSongIntent = new Intent();
+                    KeyEvent nextSong;
+                    nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0);
+                    nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
+                    nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
+                    Skipity.this.sendBroadcast(nextSongIntent);
+                    Log.w("CERV1", "UP");
+                    audio.setStreamVolume(AudioManager.STREAM_MUSIC, currentVolume - 1, AudioManager.FLAG_VIBRATE);
+                    previousVolume = currentVolume;
+                }
             }
-            else if(delta<0)
-            {
-                Intent nextSongIntent = new Intent();
-                KeyEvent nextSong;
-                nextSong = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_NEXT, 0);
-                nextSongIntent.putExtra(Intent.EXTRA_KEY_EVENT, nextSong);
-                nextSongIntent.setAction(android.content.Intent.ACTION_MEDIA_BUTTON);
-                Skipity.this.sendBroadcast(nextSongIntent);
-                Log.w("CERV1", "UP");
-                previousVolume=currentVolume;
-
+            else{
+                previousVolume = currentVolume;
+                prevent_onChange=true;
             }
+            Log.w("CERV1", "Current volume: " + audio.getStreamVolume(AudioManager.STREAM_MUSIC));
         }
+
     }
 
     private AudioManager am;
     public Intent nextSongIntent = new Intent();
     private KeyEvent nextSong;
-    private Boolean firstBlock ;
     SettingsContentObserver mSettingsContentObserver;
+    Boolean prevent_onChange;
 
     public Skipity() {
         super();
-        firstBlock = true;
+        prevent_onChange = true;
     }
 
     // BroadcastReceiver for handling ACTION_SCREEN_OFF.
     private BroadcastReceiver offReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Check action just to be on the safe side.
             if (intent.getAction().equals(Intent.ACTION_SCREEN_OFF)) {
                 getApplicationContext().getContentResolver().registerContentObserver(android.provider.Settings.System.CONTENT_URI, true, mSettingsContentObserver );
+                prevent_onChange=true;
                 Log.w("CERV1", "LOCKED");
-                //Skipity.this.sendBroadcast(nextSongIntent);
             }
         }
     };
@@ -96,11 +104,9 @@ public class Skipity extends Service {
     private BroadcastReceiver onReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            // Check action just to be on the safe side.
             if (intent.getAction().equals(Intent.ACTION_SCREEN_ON)) {
                 getApplicationContext().getContentResolver().unregisterContentObserver(mSettingsContentObserver);
                 Log.w("CERV1", "UNLOCKED");
-                //Skipity.this.sendBroadcast(nextSongIntent);
             }
         }
     };
@@ -139,12 +145,11 @@ public class Skipity extends Service {
     public void onDestroy() {
         super.onDestroy();
         unregisterReceiver(offReceiver);
-        Log.w("CERV1", "Service stopped");
     }
 
     @Override
     public IBinder onBind(Intent arg0) {
-        return null; // no IPC used
+        return null;
     }
 
 
